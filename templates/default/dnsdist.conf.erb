@@ -1,0 +1,28 @@
+-- listen for console connection
+controlSocket("127.0.0.1")
+
+-- start the web server on port 8083, using password
+webserver("0.0.0.0:8083", "<%= @key %>")
+
+-- define the good servers 
+<% @cluster_nodes.each do |member| %>
+newServer({address="<%= member['ip']-%>:<%=node.default[:dnsha][:backend_port]-%>", name="<%= member['name'] %>"})
+<%end%>
+
+-- Cache (1million entries ~1Gbyte) for objects in default pool
+-- newPacketCache(NumberOfObjectsInCache,MAxTimeObjectInCache,MinimumTtlToBeCacheble,TtlForFailureOrRefusedResponses,TtlForStaleResponses,DontAllowRecudeTtlOfCachedEntries)
+packetcache = newPacketCache(100000, 259200, 0, 600, 300, true)
+getPool(""):setCache(packetcache)
+
+-- Use stale cache if no backend is available for up to 3 hours
+setStaleCacheEntriesTTL(10800)
+
+-- accept DNS queries on UDP/<%=node.default[:dnsha][:lb_port]-%> and TCP/<%=node.default[:dnsha][:lb_port]%>
+addLocal("0.0.0.0:<%=node.default[:dnsha][:lb_port]-%>")
+
+-- switch the server balancing policy to round robin,
+-- the default being least outstanding queries
+setServerPolicy(roundrobin)
+
+-- acl
+addACL("0.0.0.0/0")
